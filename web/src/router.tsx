@@ -1,7 +1,8 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { lazyAdminPage } from "@/pages/admin/admin-page-loader";
 
+import { AuthDialogHost } from "@/components/auth/auth-dialog-host";
 import { RequireAuth } from "@/components/auth/require-auth";
 // 功能开关守卫包在页面 Suspense 之外，懒加载会让整个工作区退回全屏加载页；体积很小，直接静态引入。
 import { RequireFeature } from "@/components/auth/require-feature";
@@ -120,9 +121,31 @@ function devRoutes() {
     ];
 }
 
+/**
+ * 根布局：把全局登录弹窗挂进路由上下文内。
+ *
+ * 弹窗里的登录面板会调用 useSearchParams / useLocation。若把 AuthDialogHost 挂在
+ * RouterProvider 之外（application.tsx 里与它并排），弹窗一打开就会抛
+ * "useLocation() may be used only in the context of a <Router> component"，
+ * React 卸载整棵树，页面变成全白。
+ */
+function AppRoot() {
+    const navigate = useNavigate();
+    return (
+        <>
+            <Outlet />
+            <AuthDialogHost navigate={(to) => void navigate(to)} />
+        </>
+    );
+}
+
 export const router = createBrowserRouter([
     {
-        element: <AuthScene />,
+        element: <AppRoot />,
+        errorElement: <RouteErrorPage />,
+        children: [
+            {
+                element: <AuthScene />,
         errorElement: <RouteErrorPage />,
         children: [
             { path: "/login", element: fullScreenDeferred(<LoginPage />) },
@@ -294,5 +317,7 @@ export const router = createBrowserRouter([
             },
         ],
     },
-    { path: "*", element: fullScreenDeferred(<NotFound />) },
+            { path: "*", element: fullScreenDeferred(<NotFound />) },
+        ],
+    },
 ]);
